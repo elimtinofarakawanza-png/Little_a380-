@@ -1,67 +1,57 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const GuildConfig = require('../models/GuildConfig');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('report')
-        .setDescription('Report a user for a specific reason.')
+        .setDescription('Report a user')
         .addUserOption(option =>
-            option
-                .setName('user')
+            option.setName('user')
                 .setDescription('The user you want to report')
                 .setRequired(true)
         )
         .addStringOption(option =>
-            option
-                .setName('reason')
-                .setDescription('Reason for the report (required)')
+            option.setName('reason')
+                .setDescription('Reason for the report')
                 .setRequired(true)
         ),
 
     async execute(interaction) {
-        const allowedRole = '1473617514771775518';
-        const reportChannelId = '1473615876136767543';
+        const user = interaction.options.getUser('user');
+        const reason = interaction.options.getString('reason');
 
-        // Check if user has the required role
-        if (!interaction.member.roles.cache.has(allowedRole)) {
+        const config = await GuildConfig.findOne({ guildId: interaction.guild.id });
+
+        if (!config || !config.reportChannel) {
             return interaction.reply({
-                content: '❌ You do not have permission to use this command.',
+                content: 'No report channel set. Use `/setreportchannel` first.',
                 ephemeral: true
             });
         }
 
-        const target = interaction.options.getUser('user');
-        const reason = interaction.options.getString('reason');
-
-        if (!reason || reason.trim().length === 0) {
+        const reportChannel = interaction.guild.channels.cache.get(config.reportChannel);
+        if (!reportChannel) {
             return interaction.reply({
-                content: '❌ You must provide a valid reason.',
+                content: 'The saved report channel no longer exists. Please set a new one.',
                 ephemeral: true
             });
         }
 
         const embed = new EmbedBuilder()
-            .setTitle('🚨 New Report Submitted')
+            .setTitle('New Report')
             .addFields(
-                { name: 'Reported User', value: `${target}`, inline: true },
-                { name: 'Reported By', value: `${interaction.user}`, inline: true },
-                { name: 'Reason', value: reason }
+                { name: 'Reported User', value: `${user.tag}` },
+                { name: 'Reason', value: reason },
+                { name: 'Reported By', value: `${interaction.user.tag}` }
             )
-            .setColor('#ff0000')
+            .setColor('Red')
             .setTimestamp();
 
-        // Acknowledge to the reporter
+        await reportChannel.send({ embeds: [embed] });
+
         await interaction.reply({
-            content: '✅ Report submitted successfully.',
+            content: 'Your report has been submitted.',
             ephemeral: true
         });
-
-        // Send to the specific channel
-        const logChannel = interaction.guild.channels.cache.get(reportChannelId);
-
-        if (logChannel) {
-            logChannel.send({ embeds: [embed] });
-        } else {
-            console.error(`Report channel ${reportChannelId} not found.`);
-        }
     }
 };
