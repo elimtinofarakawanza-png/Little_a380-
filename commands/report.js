@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -19,6 +19,7 @@ module.exports = {
 
     async execute(interaction) {
         const allowedRole = '1473617514771775518';
+        const reportChannelId = '1473615876136767543';
 
         // Check if user has the required role
         if (!interaction.member.roles.cache.has(allowedRole)) {
@@ -31,7 +32,6 @@ module.exports = {
         const target = interaction.options.getUser('user');
         const reason = interaction.options.getString('reason');
 
-        // Safety check (should never happen because reason is required)
         if (!reason || reason.trim().length === 0) {
             return interaction.reply({
                 content: '❌ You must provide a valid reason.',
@@ -49,18 +49,19 @@ module.exports = {
             .setColor('#ff0000')
             .setTimestamp();
 
+        // Acknowledge to the reporter
         await interaction.reply({
             content: '✅ Report submitted successfully.',
             ephemeral: true
         });
 
-        // Send the report to a staff channel (optional)
-        const logChannel = interaction.guild.channels.cache.find(
-            ch => ch.name === 'reports' // change if needed
-        );
+        // Send to the specific channel
+        const logChannel = interaction.guild.channels.cache.get(reportChannelId);
 
         if (logChannel) {
             logChannel.send({ embeds: [embed] });
+        } else {
+            console.error(`Report channel ${reportChannelId} not found.`);
         }
     }
 };
