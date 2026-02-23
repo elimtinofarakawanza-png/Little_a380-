@@ -1,5 +1,4 @@
 const { Client, GatewayIntentBits, Collection } = require('discord.js');
-const mongoose = require('mongoose');
 const fs = require('fs');
 const path = require('path');
 
@@ -21,20 +20,12 @@ for (const file of commandFiles) {
     client.commands.set(command.name, command);
 }
 
-// MongoDB connection
-mongoose.connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-})
-.then(() => console.log('Connected to MongoDB'))
-.catch(err => console.error('MongoDB connection error:', err));
-
 // Bot ready
 client.once('ready', () => {
     console.log(`Logged in as ${client.user.tag}`);
 });
 
-// Interaction handler
+// Slash command handler
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
@@ -45,7 +36,10 @@ client.on('interactionCreate', async interaction => {
         await command.execute(interaction);
     } catch (error) {
         console.error(error);
-        await interaction.reply({ content: 'There was an error executing this command.', ephemeral: true });
+        await interaction.reply({
+            content: 'There was an error executing this command.',
+            ephemeral: true
+        });
     }
 });
 
