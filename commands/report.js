@@ -1,57 +1,62 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const GuildConfig = require('../models/GuildConfig');
+const fs = require('fs');
+const path = require('path');
+const { EmbedBuilder } = require('discord.js');
 
 module.exports = {
-    data: new SlashCommandBuilder()
-        .setName('report')
-        .setDescription('Report a user')
-        .addUserOption(option =>
-            option.setName('user')
-                .setDescription('The user you want to report')
-                .setRequired(true)
-        )
-        .addStringOption(option =>
-            option.setName('reason')
-                .setDescription('Reason for the report')
-                .setRequired(true)
-        ),
+    name: "report",
+    description: "Report a user",
+    options: [
+        {
+            name: "user",
+            description: "The user you want to report",
+            type: 6,
+            required: true
+        },
+        {
+            name: "reason",
+            description: "Reason for the report",
+            type: 3,
+            required: true
+        }
+    ],
 
     async execute(interaction) {
-        const user = interaction.options.getUser('user');
-        const reason = interaction.options.getString('reason');
+        const reportedUser = interaction.options.getUser("user");
+        const reason = interaction.options.getString("reason");
 
-        const config = await GuildConfig.findOne({ guildId: interaction.guild.id });
+        const configPath = path.join(__dirname, "../data/reportConfig.json");
+        const reportsPath = path.join(__dirname, "../data/reports.json");
 
-        if (!config || !config.reportChannel) {
-            return interaction.reply({
-                content: 'No report channel set. Use `/setreportchannel` first.',
-                ephemeral: true
-            });
-        }
+        const config = JSON.parse(fs.readFileSync(configPath));
+        const reports = JSON.parse(fs.readFileSync(reportsPath));
 
-        const reportChannel = interaction.guild.channels.cache.get(config.reportChannel);
-        if (!reportChannel) {
-            return interaction.reply({
-                content: 'The saved report channel no longer exists. Please set a new one.',
-                ephemeral: true
-            });
-        }
+        const reportId = reports.length + 1;
+
+        const newReport = {
+            id: reportId,
+            reporter: interaction.user.id,
+            reported: reportedUser.id,
+            reason: reason,
+            type: "normal",
+            timestamp: Date.now()
+        };
+
+        reports.push(newReport);
+        fs.writeFileSync(reportsPath, JSON.stringify(reports, null, 2));
 
         const embed = new EmbedBuilder()
-            .setTitle('New Report')
+            .setTitle(`Report #${reportId}`)
             .addFields(
-                { name: 'Reported User', value: `${user.tag}` },
-                { name: 'Reason', value: reason },
-                { name: 'Reported By', value: `${interaction.user.tag}` }
+                { name: "Report by", value: `<@${interaction.user.id}>` },
+                { name: "Reported User", value: `<@${reportedUser.id}>` },
+                { name: "Reason", value: reason }
             )
-            .setColor('Red')
+            .setColor("Yellow")
             .setTimestamp();
 
-        await reportChannel.send({ embeds: [embed] });
+        const channel = interaction.client.channels.cache.get(config.reportChannel);
+        if (channel) channel.send({ embeds: [embed] });
 
-        await interaction.reply({
-            content: 'Your report has been submitted.',
-            ephemeral: true
-        });
+        await interaction.reply({ content: "Report submitted.", ephemeral: true });
     }
 };
