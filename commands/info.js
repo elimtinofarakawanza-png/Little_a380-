@@ -1,9 +1,8 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 
 module.exports = {
-    data: new SlashCommandBuilder()
-        .setName('info')
-        .setDescription('Shows information about the bot (WIP)'), 
+    name: "info",
+    description: "Shows information about the bot",
 
     async execute(interaction) {
         const bot = interaction.client;
