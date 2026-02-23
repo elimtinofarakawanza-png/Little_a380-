@@ -1,31 +1,26 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const GuildConfig = require('../models/GuildConfig');
+const fs = require('fs');
+const path = require('path');
 
 module.exports = {
-    data: new SlashCommandBuilder()
-        .setName('setreportchannel')
-        .setDescription('Set the report channel for this server')
-        .addChannelOption(option =>
-            option.setName('channel')
-                .setDescription('The channel where reports will be sent')
-                .setRequired(true)
-        )
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+    name: "setreportchannel",
+    description: "Set the channel where reports will be sent",
+    options: [
+        {
+            name: "channel",
+            description: "The channel to send reports to",
+            type: 7, // CHANNEL
+            required: true
+        }
+    ],
 
     async execute(interaction) {
-        const channel = interaction.options.getChannel('channel');
+        const channel = interaction.options.getChannel("channel");
 
-        let config = await GuildConfig.findOne({ guildId: interaction.guild.id });
-        if (!config) {
-            config = new GuildConfig({ guildId: interaction.guild.id });
-        }
+        const configPath = path.join(__dirname, "../data/reportConfig.json");
+        const config = { reportChannel: channel.id };
 
-        config.reportChannel = channel.id;
-        await config.save();
+        fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 
-        await interaction.reply({
-            content: `Report channel set to ${channel}`,
-            ephemeral: true
-        });
+        await interaction.reply(`Report channel set to ${channel}`);
     }
 };
