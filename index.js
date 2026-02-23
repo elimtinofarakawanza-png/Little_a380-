@@ -1,47 +1,65 @@
-const { Client, GatewayIntentBits, Collection } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
+const fs = require("fs");
+const path = require("path");
+const { Client, GatewayIntentBits, Collection, Partials } = require("discord.js");
+require("dotenv").config();
 
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
-    ]
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMembers
+    ],
+    partials: [Partials.Channel, Partials.Message, Partials.GuildMember]
 });
+
+client.commands = new Collection();
 
 // Load commands
-client.commands = new Collection();
-const commandsPath = path.join(__dirname, 'commands');
-const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+const commandsPath = path.join(__dirname, "commands");
+const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith(".js"));
 
 for (const file of commandFiles) {
-    const command = require(`./commands/${file}`);
+    const filePath = path.join(commandsPath, file);
+    const command = require(filePath);
     client.commands.set(command.name, command);
+    console.log(`Loaded command: ${command.name}`);
 }
 
-// Bot ready
-client.once('ready', () => {
-    console.log(`Logged in as ${client.user.tag}`);
-});
+// Load events
+const eventsPath = path.join(__dirname, "events");
+const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith(".js"));
+
+for (const file of eventFiles) {
+    const filePath = path.join(eventsPath, file);
+    const event = require(filePath);
+
+    if (event.once) {
+        client.once(event.name, (...args) => event.execute(...args, client));
+    } else {
+        client.on(event.name, (...args) => event.execute(...args, client));
+    }
+
+    console.log(`Loaded event: ${event.name}`);
+}
 
 // Slash command handler
-client.on('interactionCreate', async interaction => {
+client.on("interactionCreate", async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
     const command = client.commands.get(interaction.commandName);
     if (!command) return;
 
     try {
-        await command.execute(interaction);
+        await command.execute(interaction, client);
     } catch (error) {
         console.error(error);
-        await interaction.reply({
-            content: 'There was an error executing this command.',
-            ephemeral: true
-        });
+        interaction.reply({ content: "❌ There was an error executing this command.", ephemeral: true });
     }
 });
 
-// Login
+client.once("ready", () => {
+    console.log(`Logged in as ${client.user.tag}`);
+});
+
 client.login(process.env.TOKEN);
