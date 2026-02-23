@@ -1,27 +1,29 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
+const { EmbedBuilder } = require('discord.js');
 
 module.exports = {
-    data: new SlashCommandBuilder()
-        .setName('major_report')
-        .setDescription('Report a user for a serious violation (TOS, doxxing, NSFW, threats, etc.)')
-        .addUserOption(option =>
-            option
-                .setName('user')
-                .setDescription('The user you want to report')
-                .setRequired(true)
-        )
-        .addStringOption(option =>
-            option
-                .setName('reason')
-                .setDescription('Describe the serious violation (required)')
-                .setRequired(true)
-        ),
+    name: "major_report",
+    description: "Report a user for a serious violation",
+    options: [
+        {
+            name: "user",
+            description: "The user you want to report",
+            type: 6,
+            required: true
+        },
+        {
+            name: "reason",
+            description: "Describe the serious violation",
+            type: 3,
+            required: true
+        }
+    ],
 
     async execute(interaction) {
         const staffRole = '1473617514771775518';
         const majorReportChannel = '1473615876136767543';
 
-        // Permission check
         if (!interaction.member.roles.cache.has(staffRole)) {
             return interaction.reply({
                 content: '❌ You do not have permission to use this command.',
@@ -32,37 +34,39 @@ module.exports = {
         const target = interaction.options.getUser('user');
         const reason = interaction.options.getString('reason');
 
-        if (!reason || reason.trim().length === 0) {
-            return interaction.reply({
-                content: '❌ You must provide a valid reason for a major report.',
-                ephemeral: true
-            });
-        }
+        const reportsPath = path.join(__dirname, "../data/reports.json");
+        const reports = JSON.parse(fs.readFileSync(reportsPath));
+
+        const reportId = reports.length + 1;
+
+        const newReport = {
+            id: reportId,
+            reporter: interaction.user.id,
+            reported: target.id,
+            reason: reason,
+            type: "major",
+            timestamp: Date.now()
+        };
+
+        reports.push(newReport);
+        fs.writeFileSync(reportsPath, JSON.stringify(reports, null, 2));
 
         const embed = new EmbedBuilder()
-            .setTitle('🚨 MAJOR REPORT — Serious Violation')
-            .setDescription('A serious incident has been reported.')
+            .setTitle(`🚨 MAJOR REPORT #${reportId}`)
             .addFields(
-                { name: 'Reported User', value: `${target}`, inline: true },
-                { name: 'Reported By', value: `${interaction.user}`, inline: true },
-                { name: 'Violation Details', value: reason }
+                { name: "Reported User", value: `<@${target.id}>`, inline: true },
+                { name: "Reported By", value: `<@${interaction.user.id}>`, inline: true },
+                { name: "Violation Details", value: reason }
             )
-            .setColor('#ff0000')
+            .setColor("Red")
             .setTimestamp();
 
-        // Acknowledge to the staff member
+        const channel = interaction.guild.channels.cache.get(majorReportChannel);
+        if (channel) channel.send({ embeds: [embed] });
+
         await interaction.reply({
-            content: '⚠️ Major report submitted. Staff will review this immediately.',
+            content: "⚠️ Major report submitted.",
             ephemeral: true
         });
-
-        // Send to the major report channel
-        const channel = interaction.guild.channels.cache.get(majorReportChannel);
-
-        if (channel) {
-            channel.send({ embeds: [embed] });
-        } else {
-            console.error(`Major report channel ${majorReportChannel} not found.`);
-        }
     }
 };
