@@ -44,6 +44,38 @@ module.exports = {
         reports.push(newReport);
         fs.writeFileSync(reportsPath, JSON.stringify(reports, null, 2));
 
+        // Count total reports for this user
+        const userReports = reports.filter(r => r.reported === reportedUser.id);
+
+        // Auto-quarantine threshold
+        if (userReports.length >= 5) {
+            const quarantineRole = "1475451309128945704"; // FIXED
+            const alertChannelId = "1473615876136767543";
+
+            const member = interaction.guild.members.cache.get(reportedUser.id);
+            if (member) {
+                await member.roles.add(quarantineRole).catch(() => {});
+            }
+
+            const alertChannel = interaction.guild.channels.cache.get(alertChannelId);
+            if (alertChannel) {
+                const alertEmbed = new EmbedBuilder()
+                    .setTitle("🚨 User Quarantined Automatically")
+                    .setDescription(`<@${reportedUser.id}> has reached **5 reports** and has been placed in quarantine.`)
+                    .addFields(
+                        { name: "Total Reports", value: `${userReports.length}` },
+                        { name: "Most Recent Reason", value: reason }
+                    )
+                    .setColor("Red")
+                    .setTimestamp();
+
+                alertChannel.send({
+                    content: `<@&1475451309128945704>`, // FIXED
+                    embeds: [alertEmbed]
+                });
+            }
+        }
+
         const embed = new EmbedBuilder()
             .setTitle(`Report #${reportId}`)
             .addFields(
